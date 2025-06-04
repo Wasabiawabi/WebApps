@@ -1,0 +1,28 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+    <meta charset="Shift JIS">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>‘˜aŒvZ</title>
+    <script>
+        function calculateSum() {
+            const input = document.getElementById("numberInput").value;
+            const n = parseInt(input, 10);
+            let sum = 0;
+
+            if (!isNaN(n) && n > 0) {
+                sum = (n * (n + 1)) / 2; // 1‚©‚çn‚Ü‚Å‚Ì‘˜a
+                document.getElementById("result").innerText = `1‚©‚ç${n}‚Ü‚Å‚Ì‘˜a‚Í: ${sum}`;
+            } else {
+                document.getElementById("result").innerText = "³‚Ì®”‚ğ“ü—Í‚µ‚Ä‚­‚¾‚³‚¢B";
+            }
+        }
+    </script>
+</head>
+<body>
+    <h1>1‚©‚çn‚Ü‚Å‚Ì‘˜aŒvZ</h1>
+    <input type="text" id="numberInput" placeholder="n‚ğ“ü—Í">
+    <button onclick="calculateSum()">ŒvZ</button>
+    <p id="result"></p>
+</body>
+</html>

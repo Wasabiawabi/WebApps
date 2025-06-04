@@ -1,0 +1,238 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+    <meta charset="Shift JIS">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>マインスイーパー</title>
+    <style>
+        body {
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            height: 100vh;
+            margin: 0;
+            background-color: #f0f0f0;
+        }
+        #game-container {
+            text-align: center;
+        }
+        #status {
+            font-size: 20px;
+            margin-bottom: 10px;
+        }
+    </style>
+</head>
+<body>
+    <div id="game-container">
+        <div id="status">残りマイン: <span id="mine-count">10</span></div>
+        <canvas id="canvas"></canvas>
+    </div>
+    <script>
+        const canvas = document.getElementById('canvas');
+        const ctx = canvas.getContext('2d');
+        const mineCountElement = document.getElementById('mine-count');
+        
+        // ゲーム設定
+        const rows = 10;
+        const cols = 10;
+        const cellSize = 30;
+        const mines = 10;
+        let gameOver = false;
+        let firstClick = true;
+        
+        // キャンバスサイズ設定
+        canvas.width = cols * cellSize;
+        canvas.height = rows * cellSize;
+        
+        // ゲーム状態
+        let board = Array(rows).fill().map(() => Array(cols).fill(0));
+        let revealed = Array(rows).fill().map(() => Array(cols).fill(false));
+        let flagged = Array(rows).fill().map(() => Array(cols).fill(false));
+        let minePositions = [];
+        let remainingMines = mines;
+        
+        // マインの配置
+        function placeMines(firstX, firstY) {
+            minePositions = [];
+            while (minePositions.length < mines) {
+                const x = Math.floor(Math.random() * cols);
+                const y = Math.floor(Math.random() * rows);
+                // 最初のクリックとその周囲にはマインを配置しない
+                if (Math.abs(x - firstX) <= 1 && Math.abs(y - firstY) <= 1) continue;
+                if (!minePositions.some(pos => pos.x === x && pos.y === y)) {
+                    minePositions.push({ x, y });
+                    board[y][x] = -1;
+                }
+            }
+            // 数字の計算
+            for (let y = 0; y < rows; y++) {
+                for (let x = 0; x < cols; x++) {
+                    if (board[y][x] !== -1) {
+                        board[y][x] = countAdjacentMines(x, y);
+                    }
+                }
+            }
+        }
+        
+        // 周囲のマイン数を計算
+        function countAdjacentMines(x, y) {
+            let count = 0;
+            for (let dy = -1; dy <= 1; dy++) {
+                for (let dx = -1; dx <= 1; dx++) {
+                    const newX = x + dx;
+                    const newY = y + dy;
+                    if (newX >= 0 && newX < cols && newY >= 0 && newY < rows) {
+                        if (minePositions.some(pos => pos.x === newX && pos.y === newY)) {
+                            count++;
+                        }
+                    }
+                }
+            }
+            return count;
+        }
+        
+        // セルの描画
+        function drawCell(x, y) {
+            const cellX = x * cellSize;
+            const cellY = y * cellSize;
+            
+            // セルの背景
+            ctx.fillStyle = revealed[y][x] ? '#ddd' : '#bbb';
+            ctx.fillRect(cellX, cellY, cellSize, cellSize);
+            
+            // グリッド線
+            ctx.strokeStyle = '#999';
+            ctx.strokeRect(cellX, cellY, cellSize, cellSize);
+            
+            if (revealed[y][x]) {
+                if (board[y][x] === -1) {
+                    // マイン
+                    ctx.fillStyle = '#f00';
+                    ctx.beginPath();
+                    ctx.arc(cellX + cellSize/2, cellY + cellSize/2, cellSize/3, 0, Math.PI * 2);
+                    ctx.fill();
+                } else if (board[y][x] > 0) {
+                    // 数字
+                    ctx.fillStyle = getNumberColor(board[y][x]);
+                    ctx.font = '20px Arial';
+                    ctx.textAlign = 'center';
+                    ctx.textBaseline = 'middle';
+                    ctx.fillText(board[y][x], cellX + cellSize/2, cellY + cellSize/2);
+                }
+            } else if (flagged[y][x]) {
+                // 旗
+                ctx.fillStyle = '#f00';
+                ctx.beginPath();
+                ctx.moveTo(cellX + cellSize/4, cellY + cellSize/4);
+                ctx.lineTo(cellX + cellSize/4, cellY + cellSize*3/4);
+                ctx.lineTo(cellX + cellSize*3/4, cellY + cellSize/2);
+                ctx.fill();
+            }
+        }
+        
+        // 数字の色を取得
+        function getNumberColor(num) {
+            const colors = ['#00f', '#0f0', '#f00', '#00f', '#800', '#0ff', '#000', '#888'];
+            return colors[num - 1] || '#000';
+        }
+        
+        // ゲームボードの描画
+        function draw() {
+            for (let y = 0; y < rows; y++) {
+                for (let x = 0; x < cols; x++) {
+                    drawCell(x, y);
+                }
+            }
+        }
+        
+        // セルの開封
+        function revealCell(x, y) {
+            if (x < 0 || x >= cols || y < 0 || y >= rows || revealed[y][x] || flagged[y][x]) return;
+            
+            revealed[y][x] = true;
+            
+            if (board[y][x] === -1) {
+                // ゲームオーバー
+                gameOver = true;
+                revealAll();
+                alert('ゲームオーバー！');
+                return;
+            }
+            
+            if (board[y][x] === 0) {
+                // 周囲のセルを開封
+                for (let dy = -1; dy <= 1; dy++) {
+                    for (let dx = -1; dx <= 1; dx++) {
+                        revealCell(x + dx, y + dy);
+                    }
+                }
+            }
+            
+            checkWin();
+        }
+        
+        // 旗の設置/解除
+        function toggleFlag(x, y) {
+            if (revealed[y][x]) return;
+            
+            flagged[y][x] = !flagged[y][x];
+            remainingMines += flagged[y][x] ? -1 : 1;
+            mineCountElement.textContent = remainingMines;
+        }
+        
+        // すべてのセルを開封
+        function revealAll() {
+            for (let y = 0; y < rows; y++) {
+                for (let x = 0; x < cols; x++) {
+                    revealed[y][x] = true;
+                }
+            }
+            draw();
+        }
+        
+        // 勝利判定
+        function checkWin() {
+            for (let y = 0; y < rows; y++) {
+                for (let x = 0; x < cols; x++) {
+                    if (board[y][x] !== -1 && !revealed[y][x]) return;
+                }
+            }
+            gameOver = true;
+            alert('勝利！');
+        }
+        
+        // マウスクリックイベント
+        canvas.addEventListener('click', (e) => {
+            if (gameOver) return;
+            
+            const rect = canvas.getBoundingClientRect();
+            const x = Math.floor((e.clientX - rect.left) / cellSize);
+            const y = Math.floor((e.clientY - rect.top) / cellSize);
+            
+            if (firstClick) {
+                placeMines(x, y);
+                firstClick = false;
+            }
+            
+            revealCell(x, y);
+            draw();
+        });
+        
+        // 右クリックイベント
+        canvas.addEventListener('contextmenu', (e) => {
+            e.preventDefault();
+            if (gameOver) return;
+            
+            const rect = canvas.getBoundingClientRect();
+            const x = Math.floor((e.clientX - rect.left) / cellSize);
+            const y = Math.floor((e.clientY - rect.top) / cellSize);
+            
+            toggleFlag(x, y);
+            draw();
+        });
+        
+        // 初期描画
+        draw();
+    </script>
+</body>
+</html>
