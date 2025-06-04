@@ -1,2 +1,2 @@
 # WebApps
-Applications for Web
+Basically Vibe Coding
